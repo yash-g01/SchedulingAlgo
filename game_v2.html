@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate CPU Scheduling Simulator</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2c3e50;
+            --success: #27ae60;
+            --danger: #c0392b;
+            --light: #f5f7fa;
+            --sketch-font: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            max-width: 1000px; 
+            margin: 30px auto; 
+            padding: 20px; 
+            background-color: var(--light); 
+            color: #333; 
+        }
+        h1 { text-align: center; color: var(--secondary); margin-bottom: 30px; }
+        
+        /* --- Controls & Config Section --- */
+        .config-panel {
+            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 25px;
+            display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;
+        }
+        .config-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-weight: bold; color: var(--secondary); }
+        select, input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .radio-group { display: flex; gap: 15px; }
+        .radio-group label { font-weight: normal; cursor: pointer; }
+        .hidden { display: none !important; }
+
+        /* --- Buttons --- */
+        .btn-group { display: flex; gap: 10px; }
+        button { 
+            padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 15px; font-weight: bold; 
+            transition: all 0.2s; color: white; background-color: var(--secondary);
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-blue { background-color: var(--primary); }
+        .btn-green { background-color: var(--success); }
+        .btn-red { background-color: var(--danger); }
+        .btn-outline { background-color: transparent; color: var(--secondary); border: 2px solid var(--secondary); }
+        .btn-outline.active { background-color: var(--secondary); color: white; }
+
+        /* --- Manual Input Table --- */
+        #manual-input-section { margin-bottom: 25px; }
+        .input-table { width: 100%; border-collapse: collapse; background: white; }
+        .input-table th, .input-table td { padding: 10px; border: 1px solid #ddd; text-align: center; }
+        .input-table th { background: var(--secondary); color: white; }
+        .input-table input { width: 70px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; }
+        .delete-row-btn { color: var(--danger); cursor: pointer; font-weight: bold; font-size: 1.2em; }
+
+        /* --- Gantt Chart (Hand-Drawn Style) --- */
+        .gantt-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .gantt-toolbar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .gantt-toolbar button { font-size: 13px; padding: 8px 12px; font-family: var(--sketch-font); }
+        
+        #gantt-container { 
+            display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; 
+            background-image: radial-gradient(#e0e0e0 1px, transparent 1px); background-size: 20px 20px; 
+            border: 2px dashed #ccc; border-radius: 10px; min-height: 100px;
+        }
+        .gantt-segment {
+            display: flex; align-items: center; background: #fff; border: 3px solid #333;
+            border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+            padding: 8px 15px; font-family: var(--sketch-font); box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .gantt-segment.idle { border-color: #f39c12; background: #fef9e7; }
+        .gantt-marker { font-weight: bold; font-size: 1.3em; padding: 2px 8px; border: 3px solid #333; border-radius: 50%; }
+        .gantt-marker.start { color: var(--success); border-color: var(--success); transform: rotate(-5deg); }
+        .gantt-marker.end { color: var(--danger); border-color: var(--danger); margin-left: auto; transform: rotate(5deg); }
+        .gantt-process-box {
+            margin: 0 15px; padding: 5px 15px; border: 3px solid var(--primary); border-radius: 12px;
+            color: var(--primary); font-weight: bold; font-size: 1.2em; transform: rotate(-2deg);
+        }
+        .gantt-process-box input { border: none; background: transparent; width: 40px; font-family: inherit; font-size: inherit; color: inherit; font-weight: inherit; text-align: center; outline: none; }
+        .gantt-times { display: flex; flex-direction: column; margin-left: 10px; font-size: 0.9em; }
+        .gantt-times input { width: 45px; margin: 2px 0; border: 2px solid #ccc; border-radius: 5px; text-align: center; font-family: inherit; }
+        .remove-segment { position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 18px; cursor: pointer; font-size: 12px; border: 2px solid white; }
+
+        /* --- Results Table & Feedback --- */
+        .results-table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .results-table th, .results-table td { padding: 12px; text-align: center; border: 1px solid #ddd; }
+        .results-table th { background-color: var(--secondary); color: white; }
+        .results-table input { width: 60px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
+        
+        .correct { background-color: #d4edda !important; border-color: #c3e6cb !important; color: #155724; }
+        .incorrect { background-color: #f8d7da !important; border-color: #f5c6cb !important; color: #721c24; }
+        #feedback { text-align: center; font-size: 1.3em; font-weight: bold; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        #feedback.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        #feedback.failure { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <h1>Ultimate CPU Scheduling Simulator</h1>
+    
+    <div class="config-panel">
+        <div class="config-group">
+            <label for="algo-select">Algorithm:</label>
+            <select id="algo-select">
+                <option value="FCFS">First-Come, First-Served (FCFS)</option>
+                <option value="SJF">Shortest Job First (SJF)</option>
+                <option value="RR">Round Robin (RR)</option>
+                <option value="PRIORITY">Priority Scheduling</option>
+            </select>
+        </div>
+
+        <div class="config-group hidden" id="preemption-group">
+            <label>Mode:</label>
+            <div class="radio-group">
+                <label><input type="radio" name="preemption" value="non-preemptive" checked> Non-Preemptive</label>
+                <label><input type="radio" name="preemption" value="preemptive"> Preemptive</label>
+            </div>
+        </div>
+
+        <div class="config-group hidden" id="tq-group">
+            <label for="time-quantum">Time Quantum:</label>
+            <input type="number" id="time-quantum" value="2" min="1" style="width: 60px;">
+        </div>
+
+        <div class="config-group">
+            <label>Input Mode:</label>
+            <div class="btn-group">
+                <button id="btn-mode-random" class="btn-outline active">Random</button>
+                <button id="btn-mode-manual" class="btn-outline">Manual</button>
+            </div>
+        </div>
+        
+        <div class="btn-group">
+            <button id="btn-generate" class="btn-blue">Generate / Load Problem</button>
+        </div>
+    </div>
+
+    <div id="manual-input-section" class="hidden">
+        <h3>Define Processes</h3>
+        <table class="input-table" id="manual-table">
+            <thead>
+                <tr>
+                    <th>Process ID</th>
+                    <th>Arrival Time</th>
+                    <th>Burst Time</th>
+                    <th class="priority-col hidden">Priority (Lower=Higher)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+        <button id="btn-add-row" class="btn-outline" style="margin-top: 10px;">+ Add Process</button>
+    </div>
+
+    <div class="gantt-section">
+        <h3 style="margin-top:0; color: var(--secondary); font-family: var(--sketch-font);">Gantt Chart Sketchpad</h3>
+        <div class="gantt-toolbar">
+            <button onclick="addGanttSegment(false)" style="background: var(--primary)">+ Process Block</button>
+            <button onclick="addGanttSegment(true)" style="background: #f39c12; color: black;">+ Idle Block</button>
+            <button onclick="document.getElementById('gantt-container').innerHTML=''" class="btn-red">Clear Sketchpad</button>
+        </div>
+        <div id="gantt-container">
+            </div>
+    </div>
+
+    <div id="feedback"></div>
+
+    <table class="results-table" id="results-table">
+        <thead>
+            <tr>
+                <th>Process</th>
+                <th>AT</th>
+                <th>BT</th>
+                <th class="priority-col hidden">Prio</th>
+                <th>CT (Finish Time)</th>
+                <th>TAT (CT - AT)</th>
+                <th>WT (TAT - BT)</th>
+                <th>RT (1st CPU - AT)</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+    <div style="text-align: center; margin-top: 20px;">
+        <button id="btn-check" class="btn-green" style="font-size: 1.2em; padding: 12px 30px;">Check My Answers</button>
+    </div>
+
+    <script>
+        // --- State Variables ---
+        let currentProcesses = [];
+        let solvedData = {};
+        let inputMode = 'random'; 
+
+        // --- DOM Elements ---
+        const algoSelect = document.getElementById('algo-select');
+        const preemptionGroup = document.getElementById('preemption-group');
+        const tqGroup = document.getElementById('tq-group');
+        const manualSection = document.getElementById('manual-input-section');
+        const btnModeRandom = document.getElementById('btn-mode-random');
+        const btnModeManual = document.getElementById('btn-mode-manual');
+        const priorityCols = document.querySelectorAll('.priority-col');
+
+        // --- Event Listeners for Config ---
+        algoSelect.addEventListener('change', updateUIConfig);
+        document.querySelectorAll('input[name="preemption"]').forEach(r => r.addEventListener('change', updateUIConfig));
+        btnModeRandom.addEventListener('click', () => setInputMode('random'));
+        btnModeManual.addEventListener('click', () => setInputMode('manual'));
+        document.getElementById('btn-add-row').addEventListener('click', addManualRow);
+        document.getElementById('btn-generate').addEventListener('click', loadProblem);
+        document.getElementById('btn-check').addEventListener('click', checkAnswers);
+
+        // --- UI Initialization Functions ---
+        function updateUIConfig() {
+            const algo = algoSelect.value;
+            
+            if (algo === 'SJF' || algo === 'PRIORITY') {
+                preemptionGroup.classList.remove('hidden');
+            } else {
+                preemptionGroup.classList.add('hidden');
+            }
+
+            if (algo === 'RR') {
+                tqGroup.classList.remove('hidden');
+            } else {
+                tqGroup.classList.add('hidden');
+            }
+
+            if (algo === 'PRIORITY') {
+                priorityCols.forEach(el => el.classList.remove('hidden'));
+            } else {
+                priorityCols.forEach(el => el.classList.add('hidden'));
+            }
+        }
+
+        function setInputMode(mode) {
+            inputMode = mode;
+            btnModeRandom.classList.toggle('active', mode === 'random');
+            btnModeManual.classList.toggle('active', mode === 'manual');
+            manualSection.classList.toggle('hidden', mode === 'random');
+            if (mode === 'manual' && document.querySelectorAll('#manual-table tbody tr').length === 0) {
+                addManualRow(); 
+                addManualRow();
+            }
+        }
+
+        function addManualRow() {
+            const tbody = document.querySelector('#manual-table tbody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" placeholder="e.g., P1" class="pid-input"></td>
+                <td><input type="number" min="0" value="0" class="at-input"></td>
+                <td><input type="number" min="1" value="1" class="bt-input"></td>
+                <td class="priority-col ${algoSelect.value === 'PRIORITY' ? '' : 'hidden'}"><input type="number" class="prio-input" value="1"></td>
+                <td><span class="delete-row-btn" onclick="this.closest('tr').remove()">×</span></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        // --- Gantt Chart Functions ---
+        function addGanttSegment(isIdle) {
+            const container = document.getElementById("gantt-container");
+            const segment = document.createElement("div");
+            segment.className = `gantt-segment ${isIdle ? 'idle' : ''}`;
+            
+            const processContent = isIdle ? 
+                `<div class="gantt-process-box" style="border:none; color:#333;">IDLE</div>` : 
+                `<div class="gantt-process-box"><input type="text" placeholder="Px" maxlength="3"></div>`;
+
+            segment.innerHTML = `
+                <span class="remove-segment" onclick="this.parentElement.remove()">×</span>
+                ${processContent}
+                <div class="gantt-times">
+                    <input type="number" placeholder="Start">
+                    <input type="number" placeholder="End">
+                </div>
+            `;
+            container.appendChild(segment);
+        }
+
+        // --- CORE LOGIC ---
+        function loadProblem() {
+            if (inputMode === 'random') {
+                currentProcesses = generateRandomProcesses();
+            } else {
+                currentProcesses = getManualProcesses();
+            }
+
+            if (currentProcesses.length === 0) {
+                alert("Please have at least one process with valid burst time.");
+                return;
+            }
+
+            const algo = algoSelect.value;
+            const isPreemptive = document.querySelector('input[name="preemption"]:checked').value === 'preemptive';
+            const tq = parseInt(document.getElementById('time-quantum').value) || 2;
+
+            solvedData = solveScheduling(JSON.parse(JSON.stringify(currentProcesses)), algo, isPreemptive, tq);
+
+            renderResultsTable();
+            
+            document.getElementById('feedback').innerHTML = '';
+            document.getElementById('feedback').className = '';
+            document.getElementById('gantt-container').innerHTML = '';
+            addGanttSegment(false);
+        }
+
+        function generateRandomProcesses() {
+            const procs = [];
+            for (let i = 1; i <= 4; i++) {
+                procs.push({
+                    id: `P${i}`,
+                    at: Math.floor(Math.random() * 7), 
+                    bt: Math.floor(Math.random() * 9) + 1, 
+                    prio: Math.floor(Math.random() * 5) + 1 
+                });
+            }
+            return procs;
+        }
+
+        function getManualProcesses() {
+            const procs = [];
+            document.querySelectorAll('#manual-table tbody tr').forEach(tr => {
+                const pid = tr.querySelector('.pid-input').value.trim();
+                const at = parseInt(tr.querySelector('.at-input').value);
+                const bt = parseInt(tr.querySelector('.bt-input').value);
+                const prio = parseInt(tr.querySelector('.prio-input').value);
+                if (pid && !isNaN(at) && !isNaN(bt) && bt > 0) {
+                    procs.push({ id: pid, at, bt, prio: isNaN(prio) ? 1 : prio });
+                }
+            });
+            return procs;
+        }
+
+        function solveScheduling(procs, algo, isPreemptive, tq) {
+            const n = procs.length;
+            let currentTime = 0;
+            let completed = 0;
+            let readyQueue = [];
+            
+            procs.forEach(p => { 
+                p.remBt = p.bt; 
+                p.isComplete = false; 
+                p.startTime = null;
+            });
+
+            const getAvailable = () => procs.filter(p => !p.isComplete && p.at <= currentTime);
+
+            while (completed < n) {
+                let available = getAvailable();
+                let chosenProc = null;
+
+                if (available.length === 0 && (algo !== 'RR' || readyQueue.length === 0)) {
+                    currentTime++;
+                    continue;
+                }
+
+                if (algo === 'FCFS') {
+                    available.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+                    chosenProc = available[0];
+                    if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                    currentTime += chosenProc.bt;
+                    chosenProc.ct = currentTime;
+                    chosenProc.isComplete = true;
+                    completed++;
+
+                } else if (algo === 'SJF') {
+                    if (isPreemptive) { 
+                        available.sort((a, b) => a.remBt - b.remBt || a.at - b.at);
+                        chosenProc = available[0];
+                        if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                        chosenProc.remBt--;
+                        currentTime++;
+                        if (chosenProc.remBt === 0) {
+                            chosenProc.ct = currentTime;
+                            chosenProc.isComplete = true;
+                            completed++;
+                        }
+                    } else { 
+                        available.sort((a, b) => a.bt - b.bt || a.at - b.at);
+                        chosenProc = available[0];
+                         if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                        currentTime += chosenProc.bt;
+                        chosenProc.ct = currentTime;
+                        chosenProc.isComplete = true;
+                        completed++;
+                    }
+
+                } else if (algo === 'PRIORITY') {
+                     if (isPreemptive) {
+                        available.sort((a, b) => a.prio - b.prio || a.at - b.at);
+                        chosenProc = available[0];
+                        if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                        chosenProc.remBt--;
+                        currentTime++;
+                        if (chosenProc.remBt === 0) {
+                            chosenProc.ct = currentTime;
+                            chosenProc.isComplete = true;
+                            completed++;
+                        }
+                    } else { 
+                        available.sort((a, b) => a.prio - b.prio || a.at - b.at);
+                        chosenProc = available[0];
+                        if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                        currentTime += chosenProc.bt;
+                        chosenProc.ct = currentTime;
+                        chosenProc.isComplete = true;
+                        completed++;
+                    }
+                } else if (algo === 'RR') {
+                    procs.filter(p => p.at <= currentTime && p.remBt === p.bt && !readyQueue.includes(p) && !p.isComplete)
+                         .sort((a,b) => a.at - b.at)
+                         .forEach(p => readyQueue.push(p));
+
+                    if(readyQueue.length === 0) { currentTime++; continue; }
+
+                    chosenProc = readyQueue.shift();
+                    if(chosenProc.startTime === null) chosenProc.startTime = currentTime;
+                    
+                    // FIXED: Removed the accidental space in "timeSlice"
+                    let timeSlice = Math.min(chosenProc.remBt, tq);
+                    
+                    for(let t=0; t < timeSlice; t++) {
+                        currentTime++;
+                        chosenProc.remBt--;
+                        procs.filter(p => p.at === currentTime && p.remBt === p.bt && !p.isComplete && !readyQueue.includes(p) && p !== chosenProc)
+                             .forEach(newP => readyQueue.push(newP));
+                    }
+
+                    if (chosenProc.remBt === 0) {
+                        chosenProc.ct = currentTime;
+                        chosenProc.isComplete = true;
+                        completed++;
+                    } else {
+                        readyQueue.push(chosenProc); 
+                    }
+                }
+            }
+
+            const results = {};
+            procs.forEach(p => {
+                results[p.id] = {
+                    ct: p.ct,
+                    tat: p.ct - p.at,
+                    wt: (p.ct - p.at) - p.bt,
+                    rt: p.startTime - p.at
+                };
+            });
+            return results;
+        }
+
+        function renderResultsTable() {
+            const tbody = document.querySelector("#results-table tbody");
+            tbody.innerHTML = "";
+            const showPrio = algoSelect.value === 'PRIORITY';
+
+            currentProcesses.sort((a,b) => a.id.localeCompare(b.id)).forEach(p => {
+                const tr = document.createElement("tr");
+                const prioCell = showPrio ? `<td>${p.prio}</td>` : '';
+                tr.innerHTML = `
+                    <td><strong>${p.id}</strong></td>
+                    <td>${p.at}</td>
+                    <td>${p.bt}</td>
+                    ${prioCell}
+                    <td><input type="number" id="ct-${p.id}"></td>
+                    <td><input type="number" id="tat-${p.id}"></td>
+                    <td><input type="number" id="wt-${p.id}"></td>
+                    <td><input type="number" id="rt-${p.id}"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            if(!showPrio) priorityCols.forEach(el => el.classList.add('hidden'));
+            else priorityCols.forEach(el => el.classList.remove('hidden'));
+        }
+
+        function checkAnswers() {
+            if (Object.keys(solvedData).length === 0) return;
+
+            let correctCount = 0;
+            let totalFields = 0;
+
+            currentProcesses.forEach(p => {
+                const trueVals = solvedData[p.id];
+                ['ct', 'tat', 'wt', 'rt'].forEach(field => {
+                    totalFields++;
+                    const input = document.getElementById(`${field}-${p.id}`);
+                    const userVal = parseInt(input.value);
+                    input.classList.remove('correct', 'incorrect');
+                    
+                    if (!isNaN(userVal) && userVal === trueVals[field]) {
+                        input.classList.add('correct');
+                        correctCount++;
+                    } else {
+                        input.classList.add('incorrect');
+                    }
+                });
+            });
+
+            const score = Math.round((correctCount / totalFields) * 100) || 0;
+            const feedback = document.getElementById("feedback");
+            feedback.className = score === 100 ? 'success' : 'failure';
+            feedback.innerHTML = score === 100 ? 
+                `🎉 Perfect Score: 100%! You've mastered this algorithm.` : 
+                `Score: ${score}% (${correctCount}/${totalFields} correct). <br>Check the red boxes and try again.`;
+        }
+
+        // Initialize UI
+        updateUIConfig();
+    </script>
+</body>
+</html>
+
